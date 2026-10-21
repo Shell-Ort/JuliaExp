@@ -56,8 +56,7 @@ const Path = Vector{Int64};
 
 # ╔═╡ 6a70dd05-2c5f-41ba-a362-02fc665aa6b0
 path_distance(p::Path,cities::Vector{City}) = 
-	length(p) == 1 ? 0.0 : 
-		sum(dist_cities(cities[a],cities[b]) for (a,b) in zip(p,p[[2:end; 1]]));
+	sum(dist_cities(cities[a],cities[b]) for (a,b) in zip(p,p[[2:end; 1]]));
 
 # ╔═╡ 85ffb005-678b-49b7-989b-4f48794810f0
 md"Experiment parameters"
@@ -179,7 +178,7 @@ function local_search(cities::Vector{City},
 	function local_local_search(idx)
 		city = poblation[idx]
 		cost = costs[idx]
-		for i in 1:k
+		@inbounds for i in 1:k
 			for j in i+1:k 
 				c = reverse(city,i,j)
 				co = path_distance(c,cities)
@@ -201,9 +200,9 @@ end;
 
 # ╔═╡ 26a02622-57aa-4983-91b9-020122a1ad06
 begin
-	num_iter   = 100
+	num_iter   = 1000
 	num_cities = 100
-	size_gen   = 100
+	size_gen   = 20
 	
 	minX = 1.0
 	maxX = minX + (1000.0 - minX) / 2
@@ -212,9 +211,9 @@ begin
 	maxY = minY + (1000.0 - minY) / 2
 	
 	probCrox = 0.8
-	probMut  = 0.3
+	probMut  = 0.4
 	
-	seed       = 67
+	seed       = 0
 	Random.seed!(seed)
 	cities = [random_city(minX,maxX,minY,maxY) for _ in 1:num_cities]
 	scatter(getproperty.(cities,:x), getproperty.(cities,:y), label=false, title="N⁰ of cities $num_cities, seed = $seed")
@@ -261,7 +260,7 @@ end
 # ╔═╡ eadcc480-a08e-4b42-a07d-cc089135d976
 begin
 	b
-	s = "exp_$(num_iter)iters_$(num_cities)cities_$(seed)seed"
+	s = "GA_exp_$(num_iter)iters_$(num_cities)cities_$(seed)seed"
 	cont = "Best cost: $bestCos.\n$(map(x -> [x.x, x.y],cit_path))"
 	write("results/"*s*".txt",s*"\n"*cont)
 	savefig(p,"plots/"*s*".png")
