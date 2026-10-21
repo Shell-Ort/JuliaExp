@@ -27,9 +27,6 @@ end
 # ╔═╡ 5adff0c1-e5b8-4794-9880-7d766c1e32cf
 md"Canonical GA with **TSP** problem."
 
-# ╔═╡ 84864e74-f3d0-44bd-9bbd-e253ab1e9198
-Random.seed!(67);
-
 # ╔═╡ 65d0baa3-7ae3-4bf1-b8b3-5c5b593cc553
 md"Define the cities like a struct of two points"
 
@@ -42,40 +39,233 @@ end
 # ╔═╡ 63f670b4-6816-4fb8-8cef-6644f7094b75
 random_city(minX::Float64,maxX::Float64,minY::Float64,maxY::Float64) = 
 	City(minX + rand()*(maxX - minX),
-         minY + rand()*(maxY - minY))
+         minY + rand()*(maxY - minY));
 
 # ╔═╡ e4c71686-944a-4bb4-9909-1d22ed19926a
 dist_cities(cityA::City,cityB::City) = 
 	√((cityA.x - cityB.x)^2 + (cityA.y - cityB.y)^2);
 
+# ╔═╡ 3c43c9cf-f57d-4c86-ba0c-23fbaba7cf1a
+
+
 # ╔═╡ 0b3b9da5-2d66-4c82-ac3b-484d0c03ca59
-md"A path is 1..city, the last city != first city"
+md"A path is the vector of indexes of 1..city, the last city != first city"
 
 # ╔═╡ 238eb46f-cb6c-4be8-a32a-a13eac1655a6
-const Path = Vector{City};
+const Path = Vector{Int64};
 
 # ╔═╡ 6a70dd05-2c5f-41ba-a362-02fc665aa6b0
-path_distance(p::Path) = 
+path_distance(p::Path,cities::Vector{City}) = 
 	length(p) == 1 ? 0.0 : 
-		sum(dist_cities(a,b) for (a,b) in zip(p,p[[2:end; 1]]));
+		sum(dist_cities(cities[a],cities[b]) for (a,b) in zip(p,p[[2:end; 1]]));
 
 # ╔═╡ 85ffb005-678b-49b7-989b-4f48794810f0
 md"Experiment parameters"
 
-# ╔═╡ 8e6ca0c3-051a-4ab4-b894-7cf3502fcfc2
-@bind num_cities Slider(1:100,show_value=true,default=20)
+# ╔═╡ d1643cc3-d43e-4828-9572-4afb7ec72cde
+md"Create the cities"
 
-# ╔═╡ 493d6405-c185-403d-9fac-8cc879b3ad87
-@bind minX Slider(1.0:0.1:1000.0,show_value=true)
+# ╔═╡ 746a5c3b-f538-448f-ad7f-72139df50b14
+const Poblation = Vector{Path};
 
-# ╔═╡ 2aac456a-bd9d-455e-95db-81bb2bb9a5df
-@bind maxX Slider(minX:0.1:1000.0,show_value=true,default=minX + (1000.0 - minX) / 2)
+# ╔═╡ b167862c-0253-46ca-9194-de72ba1ca01b
+md"Selection function, roullete"
 
-# ╔═╡ 86058c90-c254-4cd9-8dd8-872e5464ec1e
-@bind minY Slider(1.0:0.1:1000.0,show_value=true)
+# ╔═╡ 66f5c2be-b6b0-48b9-bde9-c9bbc1a644c8
+function selection(poblation::Poblation,costs::Vector{Float64})
+	fit = maximum(costs) .- costs .+ eps()
+	cum = cumsum(fit) ./ sum(fit)
+	fath = Poblation()
+	for _ in 1:length(poblation)
+		push!(fath,poblation[findfirst(>=(rand()),cum)])
+	end
+	return fath
+end;
 
-# ╔═╡ 962c061a-0b81-407c-b6bb-5acbf3ea73ef
-@bind maxY Slider(minY:0.1:1000.0,show_value=true,default=minY + (1000.0 - minY) / 2)
+# ╔═╡ 32b8a502-3197-4c4e-ab66-b1fbeed6f8f8
+md"Cross, two point"
+
+# ╔═╡ 14b8a829-3bda-49f2-bb80-6153cb5074c2
+function ox(p_tramo::Path, p_resto::Path, idx::Int, jdx::Int)
+	tramo = p_tramo[idx:jdx]
+	resto = filter(c -> !(c in tramo), p_resto)
+	[resto[1:idx-1]; tramo; resto[idx:end]]
+end;
+
+# ╔═╡ aabe4f31-b899-4d3d-8d22-a7a1bde197c4
+function cross(fathers::Poblation,probCrox::Float64)
+	sons = Poblation()
+	n = length(fathers)
+	@inbounds for _ in 2:2:n
+		i = rand(1:n)
+		j = rand(setdiff(1:n,i))
+		
+		p1 = fathers[i]
+		p2 = fathers[j]
+		
+		if rand() > probCrox
+			push!(sons,p1,p2)
+			continue
+		end
+		
+		k = length(p1)
+		
+		idx = rand(1:k)
+		jdx = rand(setdiff(1:k,idx))
+		idx,jdx = min(idx,jdx),max(idx,jdx)
+		
+		son1 = ox(p2,p1,idx,jdx)
+		son2 = ox(p1,p2,idx,jdx)
+		
+		push!(sons,son1,son2)
+	end
+	return sons
+end;
+
+# ╔═╡ c1505c3f-ea1d-401d-ae8a-8810e0493c75
+md"Mutation, insertion"
+
+# ╔═╡ f26f968f-92fb-4916-9489-45d2797813a3
+function mutation(sons::Poblation,probMut::Float64)
+	mut = Poblation()
+	n = length(sons)
+	@inbounds for i in 1:n
+		son = sons[i]
+		if rand() > probMut
+			push!(mut,son)
+			continue
+		end
+		if rand() < probMut
+			push!(mut,shuffle(son))
+			continue
+		end	
+		son = copy(son)
+		k = length(son)
+		
+		idx = rand(1:k)
+		el = popat!(son,idx)
+		
+		jdx = rand(setdiff(1:k-1,idx))
+		insert!(son,jdx,el)
+
+		push!(mut,son)
+	end
+	return mut
+end;
+
+# ╔═╡ 190d77d1-d930-4f95-b273-5072cb5664bd
+md"Selection, only best"
+
+# ╔═╡ 121a28ee-e73b-4447-92e0-86548649d1e0
+function selection(fathers::Poblation,fitfat::Vector{Float64},mut::Poblation,fitmut:: Vector{Float64})
+	costes = [fitfat; fitmut]
+	idx = sortperm(costes)
+	idx = idx[1:end÷2]
+	temp = [fathers; mut]
+	return temp[idx], costes[idx]
+end;
+
+# ╔═╡ 52556508-43a6-4fbe-8e27-65249305c83e
+md"Local search"
+
+# ╔═╡ cb1706ef-da2d-4725-a722-ce843bf538cf
+function local_search(cities::Vector{City},
+					  poblation::Poblation, 
+					  costs::Vector{Float64})
+	poblation = copy(poblation)
+	costs = copy(costs)
+	n = length(poblation)
+	k = length(poblation[n])
+	function local_local_search(idx)
+		city = poblation[idx]
+		cost = costs[idx]
+		for i in 1:k
+			for j in i+1:k 
+				c = reverse(city,i,j)
+				co = path_distance(c,cities)
+				if co < cost
+					poblation[idx] = c
+					costs[idx] = co
+					return
+				end
+			end
+		end
+	end
+
+	@sync for i in 1:n 
+		Threads.@spawn local_local_search(i)
+	end
+
+	return poblation, costs
+end;
+
+# ╔═╡ 26a02622-57aa-4983-91b9-020122a1ad06
+begin
+	num_iter   = 100
+	num_cities = 100
+	size_gen   = 100
+	
+	minX = 1.0
+	maxX = minX + (1000.0 - minX) / 2
+	
+	minY = 1.0
+	maxY = minY + (1000.0 - minY) / 2
+	
+	probCrox = 0.8
+	probMut  = 0.3
+	
+	seed       = 67
+	Random.seed!(seed)
+	cities = [random_city(minX,maxX,minY,maxY) for _ in 1:num_cities]
+	scatter(getproperty.(cities,:x), getproperty.(cities,:y), label=false, title="N⁰ of cities $num_cities, seed = $seed")
+end
+
+# ╔═╡ 7f8c5c68-cf43-417e-9750-ba07b0194ce4
+md"Main for"
+
+# ╔═╡ c96c3e7a-86ec-42f1-b9a1-6fc9422437ca
+begin 
+	Random.seed!(seed)
+	poblation = [shuffle(1:num_cities) for _ in 1:size_gen]
+	costs = path_distance.(poblation,Ref(cities))
+
+	bestCos, idx = findmin(costs)
+	cit_path = copy(poblation[idx])
+
+	for it in 1:num_iter
+		fath = selection(poblation,costs)
+		sons = cross(fath,probCrox)
+		mut = mutation(sons,probMut)
+		fitmut = path_distance.(mut,Ref(cities))
+		poblation, costs = selection(poblation,costs,mut,fitmut)
+		poblation, costs = local_search(cities,poblation,costs)
+		bC = argmin(costs)
+		if costs[bC] < bestCos
+			bestCos = costs[bC]
+			cit_path = poblation[bC]
+		end
+	end
+	
+	cit_path = map(i -> cities[i],cit_path)
+	p = scatter(getproperty.(cit_path,:x),getproperty.(cit_path,:y),label=false,
+			   title="Coste ruta: $(round(bestCos,digits=3))")
+	for (c1,c2) in zip(cit_path,cit_path[[2:end; 1]])
+		plot!(p,[c1.x,c2.x],[c1.y,c2.y],color=:red,label=false)
+	end
+	p
+end
+
+# ╔═╡ 0f83684c-0b73-4f9d-ba18-5bb27f775894
+@bind b Button("Guardar")
+
+# ╔═╡ eadcc480-a08e-4b42-a07d-cc089135d976
+begin
+	b
+	s = "exp_$(num_iter)iters_$(num_cities)cities_$(seed)seed"
+	cont = "Best cost: $bestCos.\n$(map(x -> [x.x, x.y],cit_path))"
+	write("results/"*s*".txt",s*"\n"*cont)
+	savefig(p,"plots/"*s*".png")
+end;
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1320,19 +1510,32 @@ uuid = "23338594-aafe-5451-b93e-139f81909106"
 # ╔═╡ Cell order:
 # ╟─5adff0c1-e5b8-4794-9880-7d766c1e32cf
 # ╠═91ea7cce-ccbe-11f1-8898-b151b9cc8b5b
-# ╠═84864e74-f3d0-44bd-9bbd-e253ab1e9198
 # ╟─65d0baa3-7ae3-4bf1-b8b3-5c5b593cc553
 # ╠═22c2b879-6944-4d33-8749-2b75a281a80d
 # ╠═63f670b4-6816-4fb8-8cef-6644f7094b75
 # ╠═e4c71686-944a-4bb4-9909-1d22ed19926a
+# ╠═3c43c9cf-f57d-4c86-ba0c-23fbaba7cf1a
 # ╟─0b3b9da5-2d66-4c82-ac3b-484d0c03ca59
 # ╠═238eb46f-cb6c-4be8-a32a-a13eac1655a6
 # ╠═6a70dd05-2c5f-41ba-a362-02fc665aa6b0
 # ╟─85ffb005-678b-49b7-989b-4f48794810f0
-# ╠═8e6ca0c3-051a-4ab4-b894-7cf3502fcfc2
-# ╠═493d6405-c185-403d-9fac-8cc879b3ad87
-# ╠═2aac456a-bd9d-455e-95db-81bb2bb9a5df
-# ╠═86058c90-c254-4cd9-8dd8-872e5464ec1e
-# ╠═962c061a-0b81-407c-b6bb-5acbf3ea73ef
+# ╟─d1643cc3-d43e-4828-9572-4afb7ec72cde
+# ╠═746a5c3b-f538-448f-ad7f-72139df50b14
+# ╟─b167862c-0253-46ca-9194-de72ba1ca01b
+# ╠═66f5c2be-b6b0-48b9-bde9-c9bbc1a644c8
+# ╟─32b8a502-3197-4c4e-ab66-b1fbeed6f8f8
+# ╠═14b8a829-3bda-49f2-bb80-6153cb5074c2
+# ╠═aabe4f31-b899-4d3d-8d22-a7a1bde197c4
+# ╟─c1505c3f-ea1d-401d-ae8a-8810e0493c75
+# ╠═f26f968f-92fb-4916-9489-45d2797813a3
+# ╟─190d77d1-d930-4f95-b273-5072cb5664bd
+# ╠═121a28ee-e73b-4447-92e0-86548649d1e0
+# ╟─52556508-43a6-4fbe-8e27-65249305c83e
+# ╠═cb1706ef-da2d-4725-a722-ce843bf538cf
+# ╠═26a02622-57aa-4983-91b9-020122a1ad06
+# ╟─7f8c5c68-cf43-417e-9750-ba07b0194ce4
+# ╠═c96c3e7a-86ec-42f1-b9a1-6fc9422437ca
+# ╠═0f83684c-0b73-4f9d-ba18-5bb27f775894
+# ╠═eadcc480-a08e-4b42-a07d-cc089135d976
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
