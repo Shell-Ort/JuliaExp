@@ -202,7 +202,7 @@ end;
 # ╔═╡ 26a02622-57aa-4983-91b9-020122a1ad06
 begin
 	num_iter   = 1000
-	num_cities = 100
+	num_cities = 200
 	size_gen   = 20
 	
 	minX = 1.0
@@ -223,6 +223,28 @@ end
 # ╔═╡ 7f8c5c68-cf43-417e-9750-ba07b0194ce4
 md"Main for"
 
+# ╔═╡ 8d985467-5ab4-473b-851d-cca10a76c59c
+function run_ga(poblation::Poblation, costs::Vector{Float64},
+				costs_matrix::Matrix{Float64}, cities::Vector{City},
+				num_iter::Int, probCrox::Float64, probMut::Float64)
+	dist(p) = path_distance.(p, Ref(costs_matrix))
+	bestCos, idx = findmin(costs)
+	cit_path = copy(poblation[idx])
+	for _ in 1:num_iter
+		fath = selection(poblation, costs)
+		sons = cross(fath, probCrox)
+		mut  = mutation(sons, probMut)
+		poblation, costs = selection(poblation, costs, mut, dist(mut))
+		poblation, costs = local_search(cities, poblation, costs, costs_matrix)
+		bC = argmin(costs)
+		if costs[bC] < bestCos
+			bestCos = costs[bC]
+			cit_path = copy(poblation[bC])
+		end
+	end
+	return bestCos, cit_path
+end;
+
 # ╔═╡ c96c3e7a-86ec-42f1-b9a1-6fc9422437ca
 begin 
 	Random.seed!(seed)
@@ -235,30 +257,12 @@ begin
 		end
 	end
 
-	dist_poblacion(poblacion::Poblation) = 
-		path_distance.(poblacion,Ref(costs_matrix))
-	
-	costs = dist_poblacion(poblation)
+	costs = path_distance.(poblation, Ref(costs_matrix))
 
-	bestCos, idx = findmin(costs)
-	cit_path = copy(poblation[idx])
-
-	for it in 1:num_iter
-		global poblation, costs, bestCos, cit_path
-		fath = selection(poblation,costs)
-		sons = cross(fath,probCrox)
-		mut = mutation(sons,probMut)
-		fitmut = dist_poblacion(sons)
-		poblation, costs = selection(poblation,costs,mut,fitmut)
-		poblation, costs = local_search(cities,poblation,costs,costs_matrix)
-		bC = argmin(costs)
-		if costs[bC] < bestCos
-			bestCos = costs[bC]
-			cit_path = poblation[bC]
-		end
-	end
+	bestCos, best_idx = run_ga(poblation, costs, costs_matrix, cities,
+							   num_iter, probCrox, probMut)
 	
-	cit_path = map(i -> cities[i],cit_path)
+	cit_path = map(i -> cities[i], best_idx)
 	p = scatter(getproperty.(cit_path,:x),getproperty.(cit_path,:y),label=false,
 			   title="Coste ruta: $(round(bestCos,digits=3))")
 	for (c1,c2) in zip(cit_path,cit_path[[2:end; 1]])
@@ -1546,6 +1550,7 @@ uuid = "23338594-aafe-5451-b93e-139f81909106"
 # ╠═cb1706ef-da2d-4725-a722-ce843bf538cf
 # ╠═26a02622-57aa-4983-91b9-020122a1ad06
 # ╟─7f8c5c68-cf43-417e-9750-ba07b0194ce4
+# ╠═8d985467-5ab4-473b-851d-cca10a76c59c
 # ╠═c96c3e7a-86ec-42f1-b9a1-6fc9422437ca
 # ╠═0f83684c-0b73-4f9d-ba18-5bb27f775894
 # ╠═eadcc480-a08e-4b42-a07d-cc089135d976
