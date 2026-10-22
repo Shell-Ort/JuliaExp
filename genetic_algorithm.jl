@@ -55,8 +55,8 @@ md"A path is the vector of indexes of 1..city, the last city != first city"
 const Path = Vector{Int64};
 
 # ╔═╡ 6a70dd05-2c5f-41ba-a362-02fc665aa6b0
-path_distance(p::Path,cities::Vector{City}) = 
-	sum(dist_cities(cities[a],cities[b]) for (a,b) in zip(p,p[[2:end; 1]]));
+path_distance(p::Path,costs_matrix::Matrix{Float64}) = 
+	sum(costs_matrix[a,b] for (a,b) in zip(p,p[[2:end; 1]]));
 
 # ╔═╡ 85ffb005-678b-49b7-989b-4f48794810f0
 md"Experiment parameters"
@@ -170,7 +170,8 @@ md"Local search"
 # ╔═╡ cb1706ef-da2d-4725-a722-ce843bf538cf
 function local_search(cities::Vector{City},
 					  poblation::Poblation, 
-					  costs::Vector{Float64})
+					  costs::Vector{Float64},
+					  costs_matrix::Matrix{Float64})
 	poblation = copy(poblation)
 	costs = copy(costs)
 	n = length(poblation)
@@ -181,7 +182,7 @@ function local_search(cities::Vector{City},
 		@inbounds for i in 1:k
 			for j in i+1:k 
 				c = reverse(city,i,j)
-				co = path_distance(c,cities)
+				co = path_distance(c,costs_matrix)
 				if co < cost
 					poblation[idx] = c
 					costs[idx] = co
@@ -226,18 +227,30 @@ md"Main for"
 begin 
 	Random.seed!(seed)
 	poblation = [shuffle(1:num_cities) for _ in 1:size_gen]
-	costs = path_distance.(poblation,Ref(cities))
+
+	costs_matrix = fill(Inf, num_cities, num_cities)
+	for j in 1:num_cities
+		for i in 1:num_cities
+			costs_matrix[i,j] = dist_cities(cities[i],cities[j])
+		end
+	end
+
+	dist_poblacion(poblacion::Poblation) = 
+		path_distance.(poblacion,Ref(costs_matrix))
+	
+	costs = dist_poblacion(poblation)
 
 	bestCos, idx = findmin(costs)
 	cit_path = copy(poblation[idx])
 
 	for it in 1:num_iter
+		global poblation, costs, bestCos, cit_path
 		fath = selection(poblation,costs)
 		sons = cross(fath,probCrox)
 		mut = mutation(sons,probMut)
-		fitmut = path_distance.(mut,Ref(cities))
+		fitmut = dist_poblacion(sons)
 		poblation, costs = selection(poblation,costs,mut,fitmut)
-		poblation, costs = local_search(cities,poblation,costs)
+		poblation, costs = local_search(cities,poblation,costs,costs_matrix)
 		bC = argmin(costs)
 		if costs[bC] < bestCos
 			bestCos = costs[bC]
