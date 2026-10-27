@@ -111,9 +111,7 @@ end
                     rf = Ref(tareaAct.fila)
                     rc = Ref(tareaAct.colo)
                     if !buscaCeldaVacia(tareaAct.s, rf, rc)
-                        if imprimir 
-                            @lock critical escribirtarea(tareaAct)
-                        end
+                        imprimir && @lock critical escribirtarea(tareaAct)
                     else
                         t = Tarea(tareaAct.s, rf[], rc[])
                         for i in 1:N
