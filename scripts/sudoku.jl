@@ -3,8 +3,8 @@ using Base.Threads
 using BenchmarkTools
 
 
-THREADS = 4
-N = 9
+const THREADS::Int64 = 4
+const N::Int64 = 9
 
 const Tablero = Matrix{Int}
 
@@ -58,7 +58,7 @@ end
 @inline extraer(q::Vector{Tarea})::Tarea = pop!(q)
 @inline insertar(q::Vector{Tarea}, nuevaTar::Tarea)::Nothing = (push!(q, nuevaTar); nothing)
 
-function valido(tareaAct::Tarea, nro::Int)::Bool
+@inline function valido(tareaAct::Tarea, nro::Int)::Bool
     s = tareaAct.s
     f, c = tareaAct.fila, tareaAct.colo
     bf = f - (f-1)%3
