@@ -4,18 +4,6 @@
 using Markdown
 using InteractiveUtils
 
-# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
-macro bind(def, element)
-    #! format: off
-    return quote
-        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
-        local el = $(esc(element))
-        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
-        el
-    end
-    #! format: on
-end
-
 # ╔═╡ 91ea7cce-ccbe-11f1-8898-b151b9cc8b5b
 begin
 	using Random
@@ -202,7 +190,7 @@ end;
 # ╔═╡ 26a02622-57aa-4983-91b9-020122a1ad06
 begin
 	num_iter   = 1000
-	num_cities = 200
+	num_cities = 2000
 	size_gen   = 20
 	
 	minX = 1.0
@@ -251,10 +239,8 @@ begin
 	poblation = [shuffle(1:num_cities) for _ in 1:size_gen]
 
 	costs_matrix = fill(Inf, num_cities, num_cities)
-	for j in 1:num_cities
-		for i in 1:num_cities
+	for j in 1:num_cities, i in 1:num_cities
 			costs_matrix[i,j] = dist_cities(cities[i],cities[j])
-		end
 	end
 
 	costs = path_distance.(poblation, Ref(costs_matrix))
@@ -271,17 +257,76 @@ begin
 	p
 end
 
-# ╔═╡ 0f83684c-0b73-4f9d-ba18-5bb27f775894
-@bind b Button("Guardar")
-
 # ╔═╡ eadcc480-a08e-4b42-a07d-cc089135d976
 begin
-	b
 	s = "GA_exp_$(num_iter)iters_$(num_cities)cities_$(seed)seed"
 	cont = "Best cost: $bestCos.\n$(map(x -> [x.x, x.y],cit_path))"
 	write("results/"*s*".txt",s*"\n"*cont)
 	savefig(p,"plots/"*s*".png")
 end;
+
+# ╔═╡ fbf8e87d-3e77-464e-a2c6-fc683366bac8
+md"Same than before, but with simulated annealing"
+
+# ╔═╡ 961255de-bb9a-4c1f-81d1-b7fe130cfe63
+function run_sa(cities_sa::Vector{City}, matriz_sa::Matrix{Float64},
+				iter_sa::Int, temp0::Float64)
+	n = length(cities_sa)
+
+	function vecino_2opt(ruta::Vector{Int})
+		i = rand(1:n-1)
+		j = rand(i+1:n)
+		return vcat(ruta[1:i-1], ruta[j:-1:i], ruta[j+1:end])
+	end
+
+	actual = shuffle(1:n)
+	coste_actual = path_distance(actual, matriz_sa)
+	mejor_ruta = copy(actual)
+	mejor_coste = coste_actual
+
+	for k in 1:iter_sa
+		temp = temp0 * (1 - k/iter_sa) + 1e-12
+		cand = vecino_2opt(actual)
+		coste_cand = path_distance(cand, matriz_sa)
+		Δ = coste_cand - coste_actual
+		if Δ < 0 || rand() < exp(-Δ / temp)
+			actual = cand
+			coste_actual = coste_cand
+			if coste_cand < mejor_coste
+				mejor_coste = coste_cand
+				mejor_ruta = copy(cand)
+			end
+		end
+	end
+	return mejor_coste, mejor_ruta
+end;
+
+# ╔═╡ 32b428cf-58a6-4976-9274-5cda4460b734
+begin
+	temp0 = 50.0
+	iter_sa = 8_000_000
+end;
+
+# ╔═╡ afc5b14a-c066-4b3a-b1e2-04d055644f44
+let
+	Random.seed!(seed)
+
+	matriz_sa = fill(Inf, num_cities, num_cities)
+	for j in 1:num_cities, i in 1:num_cities
+		matriz_sa[i,j] = dist_cities(cities[i], cities[j])
+	end
+
+	coste_sa, ruta_sa = run_sa(cities, matriz_sa, iter_sa, temp0)
+
+	puntos_sa = map(i -> cities[i], ruta_sa)
+	grafico_sa = scatter(getproperty.(puntos_sa, :x), getproperty.(puntos_sa, :y),
+						 label=false,
+						 title="SA - Coste ruta: $(round(coste_sa, digits=3))")
+	for (a, b) in zip(puntos_sa, puntos_sa[[2:end; 1]])
+		plot!(grafico_sa, [a.x, b.x], [a.y, b.y], color=:red, label=false)
+	end
+	grafico_sa
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1552,7 +1597,10 @@ uuid = "23338594-aafe-5451-b93e-139f81909106"
 # ╟─7f8c5c68-cf43-417e-9750-ba07b0194ce4
 # ╠═8d985467-5ab4-473b-851d-cca10a76c59c
 # ╠═c96c3e7a-86ec-42f1-b9a1-6fc9422437ca
-# ╠═0f83684c-0b73-4f9d-ba18-5bb27f775894
 # ╠═eadcc480-a08e-4b42-a07d-cc089135d976
+# ╟─fbf8e87d-3e77-464e-a2c6-fc683366bac8
+# ╠═961255de-bb9a-4c1f-81d1-b7fe130cfe63
+# ╠═32b428cf-58a6-4976-9274-5cda4460b734
+# ╠═afc5b14a-c066-4b3a-b1e2-04d055644f44
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
