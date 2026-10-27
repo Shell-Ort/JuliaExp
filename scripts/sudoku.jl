@@ -1,5 +1,7 @@
 # Ejercicio de resuloción de sudoku con bolsa de tareas, en la practica de PPD era en C pero lo paso a Julia.
 using Base.Threads
+using BenchmarkTools
+
 
 THREADS = 4
 N = 9
@@ -12,7 +14,7 @@ struct Tarea
     colo::Int
 end
 
-function buscaCeldaVacia(s::Tablero, x::Ref{Int}, y::Ref{Int})::Bool
+@inline function buscaCeldaVacia(s::Tablero, x::Ref{Int}, y::Ref{Int})::Bool
     while x[] <= N
         while y[] <= N
             if s[x[], y[]] == 0
@@ -42,7 +44,7 @@ end
     return
 end
 
-function escribirtarea(tareaAct::Tarea)::Nothing
+@inline function escribirtarea(tareaAct::Tarea)::Nothing
     for i in 1:N
         for j in 1:N
             print("$(tareaAct.s[i,j]) ")
@@ -70,7 +72,7 @@ function valido(tareaAct::Tarea, nro::Int)::Bool
     return true
 end
 
-function ponerNumero(t::Tarea, nro::Int)::Tarea
+@inline function ponerNumero(t::Tarea, nro::Int)::Tarea
     s = copy(t.s)
     s[t.fila, t.colo] = nro
     if t.colo < N
@@ -82,7 +84,7 @@ function ponerNumero(t::Tarea, nro::Int)::Tarea
     end
 end
 
-function resulverSudoku()::Nothing
+@inline function resolverSudoku(;imprimir::Bool = true)::Nothing
     bolsa = Tarea[]
     iniciar(bolsa)
     critical = ReentrantLock()
@@ -109,7 +111,9 @@ function resulverSudoku()::Nothing
                     rf = Ref(tareaAct.fila)
                     rc = Ref(tareaAct.colo)
                     if !buscaCeldaVacia(tareaAct.s, rf, rc)
-                        @lock critical escribirtarea(tareaAct)
+                        if imprimir 
+                            @lock critical escribirtarea(tareaAct)
+                        end
                     else
                         t = Tarea(tareaAct.s, rf[], rc[])
                         for i in 1:N
@@ -131,5 +135,6 @@ function resulverSudoku()::Nothing
     end
 end
 
-resulverSudoku()
-println("FIN")
+# resolverSudoku()
+
+@btime resolverSudoku(imprimir=false) samples=1000 evals=1
