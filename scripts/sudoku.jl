@@ -14,16 +14,17 @@ struct Tarea
     colo::Int
 end
 
+# En Julia recorremos al reves porque internamente guarda columna fila, más rapidez así
 @inline function buscaCeldaVacia(s::Tablero, x::Ref{Int}, y::Ref{Int})::Bool
-    while x[] <= N
-        while y[] <= N
-            if s[x[], y[]] == 0
+    while y[] <= N
+        while x[] <= N
+            @inbounds if s[x[], y[]] == 0
                 return true
             end
-            y[] += 1
+            x[] += 1
         end
-        y[] = 1
-        x[] += 1
+        x[] = 1
+        y[] += 1
     end
     return false
 end
@@ -47,7 +48,7 @@ end
 @inline function escribirtarea(tareaAct::Tarea)::Nothing
     for i in 1:N
         for j in 1:N
-            print("$(tareaAct.s[i,j]) ")
+            @inbounds print("$(tareaAct.s[i,j]) ")
         end
         println()
     end
@@ -63,10 +64,10 @@ end
     f, c = tareaAct.fila, tareaAct.colo
     bf = f - (f-1)%3
     bc = c - (c-1)%3
-    @inbounds if nro in view(s, f, :) || nro in view(s, :, c)
+    @inbounds if nro ∈ view(s, f, :) || nro ∈ view(s, :, c)
         return false
     end
-    @inbounds if nro in view(s, bf:(bf+2), bc:(bc+2))
+    @inbounds if nro ∈ view(s, bf:(bf+2), bc:(bc+2))
         return false
     end
     return true
@@ -74,11 +75,11 @@ end
 
 @inline function ponerNumero(t::Tarea, nro::Int)::Tarea
     s = copy(t.s)
-    s[t.fila, t.colo] = nro
-    if t.colo < N
-        return Tarea(s, t.fila, t.colo + 1)
-    elseif t.fila < N
-        return Tarea(s, t.fila + 1, 1)
+    @inbounds s[t.fila, t.colo] = nro
+    if t.fila < N
+        return Tarea(s, t.fila + 1, t.colo)
+    elseif t.colo < N
+        return Tarea(s, 1, t.colo + 1)
     else
         return Tarea(s, N, N)
     end
@@ -135,4 +136,4 @@ end
 
 # resolverSudoku()
 
-@btime resolverSudoku(imprimir=false) samples=1000 evals=1
+@btime resolverSudoku(imprimir = false)
