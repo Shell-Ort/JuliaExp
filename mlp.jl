@@ -23,10 +23,10 @@ end;
 # ╔═╡ d1ea5202-9a4d-4c31-ae88-12e220ed7e4b
 begin 
 	struct MLP
-        capas::Vector{Capa}
+        capas :: Vector{Capa}
     end
     
-    MLP(tamaños::Vector{Int}) =
+    MLP(tamaños :: Vector{Int}) =
         MLP([Capa(i, j) for (i,j) = zip(tamaños,tamaños[2:end])])
 end;
 
@@ -43,8 +43,8 @@ end;
 md"Función de avance"
 
 # ╔═╡ 7f9c3234-a9ef-4371-92c4-476cc57f17e0
-function forward(r::MLP,x)
-	act = [Vector{Float64}(x)]
+function forward(r :: MLP,x)
+	act = [collect(x)]
 	for capa = r.capas
 		push!(act,sigmoid.(capa.W * act[end] .+ capa.b))
 	end
@@ -55,7 +55,7 @@ end;
 md"Función de step y backpropagation"
 
 # ╔═╡ 6b600e0b-600c-442d-9588-b120d257e776
-function step!(r::MLP,x,y,lr)
+function step!(r :: MLP,x,y,lr)
 	a = forward(r,x)
 	δ = (a[end] .- y) .* dsigmoid.(a[end])
 	for i = length(r.capas):-1:1
@@ -94,12 +94,12 @@ begin
     	0.0
     ];
     
-    for época in 1:10_000
-        pérdida = mean(step!(red, x, y, 0.5) for (x, y) in zip(eachrow(X), eachrow(Y)))
-        época % 2000 == 0 && println("Época $época, pérdida = $(round(pérdida, digits=5))")
+    for epoch = 1:10_000
+        pérdida = mean(step!(red, x, y, 0.5) for (x, y) = zip(eachrow(X), eachrow(Y)))
+        epoch % 2000 == 0 && println("Época $epoch, pérdida = $(round(pérdida, digits=5))")
     end
 
-    for (x, y) in zip(eachrow(X), eachrow(Y))
+    for (x, y) = zip(eachrow(X), eachrow(Y))
         println("$x → $(round(predict(red, x)[1], digits=3))  (esperado $(y[1]))")
     end
 end
