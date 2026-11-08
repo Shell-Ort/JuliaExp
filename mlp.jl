@@ -14,8 +14,8 @@ end
 # ╔═╡ 4800c9b7-2044-4f3c-b5fa-5000dc88bb1b
 begin
     mutable struct Capa
-        W::Matrix{Float64}
-        b::Vector{Float64}
+        W :: Matrix{Float64}
+        b :: Vector{Float64}
     end
     Capa(n_in, n_out) = Capa(randn(n_out, n_in) * sqrt(2 / n_in), zeros(n_out))
 end;
@@ -35,8 +35,8 @@ md"Función activación y derivada"
 
 # ╔═╡ 635afa75-0565-49c8-86ed-eaee005f7715
 begin
-	sigmoid(x) = 1 / (1 + exp(-x)) 
-	dsigmoid(x) = x * (1 - x)
+	sigmoid(x :: Number)  = 1 / (1 + exp(-x))
+	dsigmoid(x :: Number) = x * (1 - x)
 end;
 
 # ╔═╡ e25c1890-228d-4ddc-b5bf-acfe7a9a7e8b
@@ -44,7 +44,7 @@ md"Función de avance"
 
 # ╔═╡ 7f9c3234-a9ef-4371-92c4-476cc57f17e0
 function forward(r :: MLP,x)
-	act = [collect(x)]
+	act = [float.(vcat(x))]
 	for capa = r.capas
 		push!(act,sigmoid.(capa.W * act[end] .+ capa.b))
 	end
@@ -63,43 +63,31 @@ function step!(r :: MLP,x,y,lr)
 		gradW = δ * a[i]'
 		gradB = δ
 		# Propagación
-		if i > 1
-			δ = (capa.W' * δ) .* dsigmoid.(a[i])
-		end
+		i > 1 && (δ = (capa.W' * δ) .* dsigmoid.(a[i]))
 		capa.W .-= lr .* gradW
         capa.b .-= lr .* gradB
 	end
-	return sum((a[end] .- y) .^ 2) / 2
+	return 0.5 * sum((a[end] .- y) .^ 2)
 end;
 
 # ╔═╡ c5bc68fb-0d78-4c12-b66a-a8edd13eb546
 predict(red::MLP, x) = forward(red, x)[end];
 
 # ╔═╡ f5a02b6c-7f19-40be-b906-84a7c3df8377
-begin
+let
 	Random.seed!(42)
     red = MLP([2, 10, 1])
 
-    X = [
-    	0.0 0.0
-    	0.0 1.0
-    	1.0 0.0
-    	1.0 1.0
-    ];
-    
-    Y = [
-    	0.0
-    	1.0
-    	1.0
-    	0.0
-    ];
+    X = [0.0 0.0 1.0 1.0
+         0.0 1.0 0.0 1.0]
+    Y = [0.0 1.0 1.0 0.0]
     
     for epoch = 1:10_000
-        pérdida = mean(step!(red, x, y, 0.5) for (x, y) = zip(eachrow(X), eachrow(Y)))
-        epoch % 2000 == 0 && println("Época $epoch, pérdida = $(round(pérdida, digits=5))")
+        lost = mean(step!(red, x, y, 0.5) for (x, y) = zip(eachcol(X), eachcol(Y)))
+        epoch % 2000 == 0 && println("Época $epoch, pérdida = $(round(lost, digits=5))")
     end
 
-    for (x, y) = zip(eachrow(X), eachrow(Y))
+    for (x, y) = zip(eachcol(X), eachcol(Y))
         println("$x → $(round(predict(red, x)[1], digits=3))  (esperado $(y[1]))")
     end
 end
