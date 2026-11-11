@@ -67,7 +67,7 @@ function kmeans(X,k :: Int64;
 	k >= 1 || throw(ArgumentError("K must be positive >= 1, k is $k"))
 	n >= k || throw(ArgumentError("The size of X must be at least k. ($n < $k)"))
 
-	results = []
+	result = []
 	rng = seed isa Bool ? Random.default_rng() : Xoshiro(seed)
 	for _ = 1:n_init
 		
@@ -97,12 +97,13 @@ function kmeans(X,k :: Int64;
 		end
 
 		cost = sum( dist(X[:,i],C[:,A[i]]) for i = 1:n)
-		push!(results,(cost = cost,C = C,A = A))
+
+		if result == [] || result.cost > cost 
+			result = (cost = cost,C = C,A = A)
+		end
 	end
 
-	idx = argmin(getfield.(results,:cost))
-	
-	return results[idx].C,results[idx].A
+	return result.C,result.A
 end;
 
 # ╔═╡ ea463abd-131d-43d0-8f0a-dfa4fd7d6b97
