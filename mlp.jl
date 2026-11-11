@@ -75,7 +75,7 @@ predict(red::MLP, x) = forward(red, x)[end];
 
 # ╔═╡ f5a02b6c-7f19-40be-b906-84a7c3df8377
 let
-	Random.seed!(42)
+	Random.seed!(67)
     red = MLP([2, 10, 1])
 
     X = [0.0 0.0 1.0 1.0
@@ -86,9 +86,9 @@ let
         lost = mean(step!(red, x, y, 0.5) for (x, y) = zip(eachcol(X), eachcol(Y)))
         epoch % 2000 == 0 && println("Época $epoch, pérdida = $(round(lost, digits=5))")
     end
-
+    
     for (x, y) = zip(eachcol(X), eachcol(Y))
-        println("$x → $(round(predict(red, x)[1], digits=3))  (esperado $(y[1]))")
+        println("$x → $(round(only(predict(red, x)), digits=3))  (esperado $(y[1]))")
     end
 end
 
