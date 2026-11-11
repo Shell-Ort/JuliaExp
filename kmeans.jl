@@ -9,6 +9,7 @@ begin
 	using Statistics
 	using Random
 	using Plots
+	using StatsBase
 end
 
 # ╔═╡ 2a9beada-31e9-4827-90a2-90fb4f6fdd53
@@ -38,7 +39,18 @@ Devuelve Centroides y Asignaciones
 function kmeans(X,k :: Int64; 
 				maxiter :: Int64 = 500, 
 				dist :: Union{Symbol,Function} = :euclid,
-				seed :: Union{Int,Bool} = false)
+				seed :: Union{Int,Bool} = false,
+				n_init :: Union{String,Int} = "auto",
+				kmeanspp :: Bool = true)
+	if n_init isa String 
+		n_init ∈ ["auto"] || throw(ArgumentError("Not recognise value for n_init: $n_init"))
+		if n_init == "auto"
+			# Igual de scifit
+			n_init = kmeanspp ? 1 : 10
+		end
+	else 
+		n_init > 0 || throw(ArgumentError("n_init must be a non zero parameter."))
+	end
 	
 	if dist isa Symbol
 		if dist == :euclid 
@@ -55,20 +67,42 @@ function kmeans(X,k :: Int64;
 	k >= 1 || throw(ArgumentError("K must be positive >= 1, k is $k"))
 	n >= k || throw(ArgumentError("The size of X must be at least k. ($n < $k)"))
 
-	C = isa(seed,Bool) ? X[:,randperm(n)[1:k]] : X[:,randperm(Xoshiro(seed),n)[1:k]]
-	A = zeros(Int,n);
-	
-	for _ = 1:maxiter
-		new = [argmin([dist(X[:,i],C[:,j]) for j = 1:k]) for i = 1:n]
-		A == new && break
-		A = new 
-		for j = 1:k 
-			idx = findall(==(j),A)
-			isempty(idx) || (C[:,j] = mean(X[:,idx],dims=2))
+	results = []
+	rng = seed isa Bool ? Random.default_rng() : Xoshiro(seed)
+	for _ = 1:n_init
+		
+		if !kmeanspp 
+			C = isa(seed,Bool) ?  X[:,randperm(n)[1:k]] : X[:,randperm(rng,n)[1:k]] 
+		else
+			# Algoritmo de kmeans++
+			idxs = [rand(Xoshiro(seed),1:n)]
+			d2 = [dist(X[:,i],X[:,idxs[end]]) for i = 1:n]
+			for _ = 2:k
+				idx = sample(rng,1:n,Weights(d2./sum(d2)))
+				push!(idxs,idx)
+				d2 = min.(d2,dist(X[:,i],X[:,idx]) for i = 1:n)
+			end
+			C = X[:,idxs]
 		end
+
+		A = zeros(Int,n)
+		for _ = 1:maxiter
+			new = [argmin([dist(X[:,i],C[:,j]) for j = 1:k]) for i = 1:n]
+			A == new && break
+			A = new
+			for j = 1:k 
+				idx = findall(==(j),A)
+				isempty(idx) || (C[:,j] = mean(X[:,idx],dims=2))
+			end
+		end
+
+		cost = sum( dist(X[:,i],C[:,A[i]]) for i = 1:n)
+		push!(results,(cost = cost,C = C,A = A))
 	end
 
-	return C,A
+	idx = argmin(getfield.(results,:cost))
+	
+	return results[idx].C,results[idx].A
 end;
 
 # ╔═╡ ea463abd-131d-43d0-8f0a-dfa4fd7d6b97
@@ -93,9 +127,11 @@ PLUTO_PROJECT_TOML_CONTENTS = """
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
 Plots = "~1.41.7"
+StatsBase = "~0.34.13"
 """
 
 # ╔═╡ 00000000-0000-0000-0000-000000000002
@@ -104,7 +140,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.13.3"
 manifest_format = "2.1"
-project_hash = "7430fabe9205aff2536668a528f9d951ad1aeee1"
+project_hash = "bc6f52caa56af5a9ae016b6ea9454899fdb711b3"
 
 [[deps.AliasTables]]
 deps = ["PtrArrays", "Random"]
