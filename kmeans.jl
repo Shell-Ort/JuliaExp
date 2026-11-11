@@ -36,10 +36,10 @@ Devuelve Centroides y Asignaciones
 "
 
 # ╔═╡ 1318b846-fba4-4061-926b-20316c9e68eb
-function kmeans(X,k :: Int64; 
+@views function kmeans(X,k :: Int64; 
 				maxiter :: Int64 = 500, 
 				dist :: Union{Symbol,Function} = :euclid,
-				seed :: Union{Int,Bool} = false,
+				seed :: Union{Int,Nothing} = nothing,
 				n_init :: Union{String,Int} = "auto",
 				kmeanspp :: Bool = true)
 	if n_init isa String 
@@ -67,22 +67,22 @@ function kmeans(X,k :: Int64;
 	k >= 1 || throw(ArgumentError("K must be positive >= 1, k is $k"))
 	n >= k || throw(ArgumentError("The size of X must be at least k. ($n < $k)"))
 
-	result = []
-	rng = seed isa Bool ? Random.default_rng() : Xoshiro(seed)
+	result = nothing
+	rng = seed === nothing ? Random.default_rng() : Xoshiro(seed)
 	for _ = 1:n_init
 		
 		if !kmeanspp 
-			C = isa(seed,Bool) ?  X[:,randperm(n)[1:k]] : X[:,randperm(rng,n)[1:k]] 
+			C = float(copy(X[:,randperm(rng,n)[1:k]]))
 		else
 			# Algoritmo de kmeans++
-			idxs = [rand(Xoshiro(seed),1:n)]
+			idxs = [rand(rng,1:n)]
 			d2 = [dist(X[:,i],X[:,idxs[end]]) for i = 1:n]
 			for _ = 2:k
 				idx = sample(rng,1:n,Weights(d2./sum(d2)))
 				push!(idxs,idx)
 				d2 = min.(d2,dist(X[:,i],X[:,idx]) for i = 1:n)
 			end
-			C = X[:,idxs]
+			C = float(copy(X[:,idxs]))
 		end
 
 		A = zeros(Int,n)
@@ -96,9 +96,9 @@ function kmeans(X,k :: Int64;
 			end
 		end
 
-		cost = sum( dist(X[:,i],C[:,A[i]]) for i = 1:n)
+		cost = sum(dist(X[:,i],C[:,A[i]]) for i = 1:n)
 
-		if result == [] || result.cost > cost 
+		if result === nothing || result.cost > cost 
 			result = (cost = cost,C = C,A = A)
 		end
 	end
@@ -108,13 +108,14 @@ end;
 
 # ╔═╡ ea463abd-131d-43d0-8f0a-dfa4fd7d6b97
 begin 
-    K, num_por_clase = 3, 100
-    X = hcat([randn(2, num_por_clase) .+ 10 .* rand(2) for _ in 1:K]...)
+    K, num_por_clase = 50, 1000
+    X = hcat([randn(2, num_por_clase) .+ K .* rand(2) for _ in 1:K]...)
     
 	C, A = kmeans(X,K)
 	scatter(X[1,:], X[2,:];
         group = A,
         markersize = 4, alpha = 0.7,
+        legend = false,
         xlabel = "x₁", ylabel = "x₂", title = "k-means (k = $K)")
 
     scatter!(C[1,:], C[2,:];
