@@ -73,8 +73,9 @@ end;
 
 # ╔═╡ ea463abd-131d-43d0-8f0a-dfa4fd7d6b97
 begin 
-    K = 3;
-	X = hcat(randn(2,100), randn(2,100) .+ 4, randn(2,100) .+ [8, 0])
+    K, num_por_clase = 3, 100
+    X = hcat([randn(2, num_por_clase) .+ 10 .* rand(2) for _ in 1:K]...)
+    
 	C, A = kmeans(X,K)
 	scatter(X[1,:], X[2,:];
         group = A,
